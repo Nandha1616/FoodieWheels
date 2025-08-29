@@ -1,0 +1,102 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { makeRequest } from "../../services/apiServices";
+import { toast } from "react-hot-toast";
+
+function useProductCrud() {
+  const queryClient = useQueryClient();
+
+  // Fetch products
+  const useFetchProducts = (vendorId = null, productId = null) => {
+    const endpoint = productId ? `/product/one/${vendorId}` : "/product";
+
+    return useQuery({
+      queryKey: ["products", vendorId, productId].filter(Boolean),
+      queryFn: () => makeRequest(`/product/one/${vendorId}`, "GET"),
+      enabled: Boolean(vendorId),
+      staleTime: 5 * 60 * 1000, // Optional: Reduce unnecessary fetches
+      select: (data) => data?.product || data
+    });
+  };
+
+  const useFetchAllProducts = (vendorId = null) => {
+    return useQuery({
+      queryKey: ["products", vendorId].filter(Boolean),
+      queryFn: () => makeRequest(`/product/vendor/${vendorId}`, "GET"),
+      staleTime: 5 * 60 * 1000,
+      cacheTime: 10 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      select: (data) => data?.products || [],
+      enabled: Boolean(vendorId)
+    });
+  };
+
+  // Generic mutation handler
+  const useCrudMutation = (method, getEndpoint, onSuccessCallback) => {
+    return useMutation({
+      mutationFn: (payload) =>
+        makeRequest(getEndpoint(payload), method, payload?.data),
+      onMutate: async ({ productId, updateData }) => {
+        const queryKey = ["products", productId];
+        await queryClient.cancelQueries(queryKey);
+
+        // Optimistic update
+        const previousData = queryClient.getQueryData(queryKey);
+        queryClient.setQueryData(queryKey, (oldData) =>
+          oldData ? { ...oldData, ...updateData } : oldData
+        );
+
+        return { previousData, queryKey };
+      },
+      onError: (error, _, context) => {
+        const { previousData, queryKey } = context || {};
+        if (previousData) {
+          queryClient.setQueryData(queryKey, previousData);
+        }
+        toast.error(`Operation failed: ${error.message}`);
+      },
+      onSuccess: () => {
+        queryClient.invalidateQueries(["products"]);
+        toast.success("Operation successful.");
+        if (onSuccessCallback) onSuccessCallback();
+      },
+      onSettled: (_, __, context) => {
+        const { queryKey } = context || {};
+        if (queryKey) {
+          queryClient.invalidateQueries(queryKey);
+        }
+      }
+    });
+  };
+
+  // CRUD operations
+  const useCreateProduct = () =>
+    useCrudMutation(
+      "POST",
+      () => "/product",
+      () => toast.success("Product created successfully!")
+    );
+
+  const useUpdateProduct = () =>
+    useCrudMutation(
+      "PUT",
+      ({ productId }) => `/product/${productId}`,
+      () => toast.success("Product updated successfully!")
+    );
+
+  const useDeleteProduct = () =>
+    useCrudMutation(
+      "DELETE",
+      ({ productId }) => `/product/${productId}`,
+      () => toast.success("Product deleted successfully!")
+    );
+
+  return {
+    useFetchProducts,
+    useFetchAllProducts,
+    useCreateProduct,
+    useUpdateProduct,
+    useDeleteProduct
+  };
+}
+
+export default useProductCrud;

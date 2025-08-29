@@ -1,0 +1,14 @@
+{
+    "product": {
+        "shopName": "Foodie's Delight",
+        "phone": 9876543210,
+        "address": "123 Food Street, Coimbatore",
+        "starttime": "9:00 AM",
+        "endtime": "10:00 PM",
+        "price": 500,
+        "shopImage": "https://example.com/shop.jpg",
+        "menuImage": "https://example.com/menu.jpg",
+        "role": "admin",
+        "description": "A great place for food lovers."
+    }
+}
